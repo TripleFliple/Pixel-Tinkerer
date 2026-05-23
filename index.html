@@ -802,7 +802,7 @@ function initMatrixPan(){
   window.addEventListener('mousemove',e=>{
     if(!isPanDragging)return;
     const dx=e.clientX-panStartX,dy=e.clientY-panStartY;
-    if(Math.abs(dx)>3||Math.abs(dy)>3)panMoved=true;
+    if(Math.abs(dx)>6||Math.abs(dy)>6)panMoved=true;
     panX=panStartPanX+dx;panY=panStartPanY+dy;
     clampPan();applyPan();
   });
@@ -826,27 +826,49 @@ function initMatrixPan(){
     clampPan();applyPan();
   },{passive:false});
 
-  // Touch
+  // Touch — tap vs drag distinction
+  // Always start pan on touchstart regardless of target.
+  // On touchend: if finger barely moved = tap → fire cell action.
+  //              if finger moved = drag → do nothing extra.
   vp.addEventListener('touchstart',e=>{
     if(e.touches.length!==1)return;
+    e.preventDefault();
     const t=e.touches[0];
-    if(t.target.closest('.compat-cell:not(.header-cell),.add-axis-btn,.axis-swatch'))return;
     isPanDragging=true;panMoved=false;
     panStartX=t.clientX;panStartY=t.clientY;
     panStartPanX=panX;panStartPanY=panY;
     vp.classList.add('dragging');
-  },{passive:true});
-  window.addEventListener('touchmove',e=>{
+  },{passive:false});
+  vp.addEventListener('touchmove',e=>{
     if(!isPanDragging||e.touches.length!==1)return;
+    e.preventDefault();
     const t=e.touches[0];
     const dx=t.clientX-panStartX,dy=t.clientY-panStartY;
-    if(Math.abs(dx)>3||Math.abs(dy)>3)panMoved=true;
+    if(Math.abs(dx)>6||Math.abs(dy)>6)panMoved=true;
     panX=panStartPanX+dx;panY=panStartPanY+dy;
     clampPan();applyPan();
+  },{passive:false});
+  vp.addEventListener('touchend',e=>{
+    if(!isPanDragging)return;
+    isPanDragging=false;vp.classList.remove('dragging');
+    // If finger didn't move, treat as a tap — fire the target element's click
+    if(!panMoved){
+      const t=e.changedTouches[0];
+      const target=document.elementFromPoint(t.clientX,t.clientY);
+      if(target){
+        // Walk up to find clickable matrix element
+        const cell=target.closest('.compat-cell:not(.header-cell)');
+        const swatch=target.closest('.axis-swatch');
+        const addBtn=target.closest('.add-axis-btn');
+        if(swatch)swatch.click();
+        else if(addBtn)addBtn.click();
+        else if(cell)cell.click();
+      }
+    }
   },{passive:true});
-  window.addEventListener('touchend',()=>{
-    if(isPanDragging){isPanDragging=false;vp.classList.remove('dragging');}
-  });
+  vp.addEventListener('touchcancel',()=>{
+    isPanDragging=false;vp.classList.remove('dragging');
+  },{passive:true});
 }
 
 function clampPan(){
