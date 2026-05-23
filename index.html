@@ -136,7 +136,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
 .tool-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(200,255,0,0.06);}
 .tool-icon{font-size:16px;line-height:1;}
 .active-color-display{display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);}
-.tool-swatch{width:28px;height:28px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.1s,transform 0.1s;flex-shrink:0;}
+.tool-swatch,.random-color-btn,.axis-swatch,.compat-cell,.tool-btn,.tinker-btn,.preset-category-header{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+.tool-swatch{width:36px;height:36px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.1s,transform 0.1s;flex-shrink:0;}
 .tool-swatch:hover{transform:scale(1.15);}
 .tool-swatch.active-swatch{border-color:var(--accent);}
 
@@ -330,7 +333,7 @@ select option{background:#1a1a1a;}
       <div class="section-label">Paint Color</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
         <div class="random-color-btn" id="random-color-btn" onclick="rollRandomColor()" title="Random color">?</div>
-        <div id="tool-color-picker" style="display:contents"></div>
+        <div id="tool-color-picker" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
     </div>
   </div>
@@ -389,11 +392,11 @@ select option{background:#1a1a1a;}
         <div class="section-label">Grid</div>
         <div class="slider-row">
           <div class="slider-top"><span class="slider-label">Width</span><span class="slider-val" id="val-gw">20</span></div>
-          <input type="range" min="1" max="500" value="20" id="sl-gw" oninput="updateGridSize()">
+          <input type="range" min="1" max="300" value="20" id="sl-gw" oninput="updateGridSize()">
         </div>
         <div class="slider-row">
           <div class="slider-top"><span class="slider-label">Height</span><span class="slider-val" id="val-gh">20</span></div>
-          <input type="range" min="1" max="500" value="20" id="sl-gh" oninput="updateGridSize()">
+          <input type="range" min="1" max="300" value="20" id="sl-gh" oninput="updateGridSize()">
         </div>
       </div>
       <div class="sim-divider"></div>
@@ -523,6 +526,22 @@ select option{background:#1a1a1a;}
           <span>Curated</span><span class="preset-cat-arrow" id="arr-cat-curated">▾</span>
         </div>
         <div class="preset-category-body" id="cat-curated">
+
+          <div class="preset-item" onclick="loadPreset('grandtour')">
+            <div class="preset-dots">
+              <div class="preset-dot" style="background:hsl(0,70%,50%)"></div>
+              <div class="preset-dot" style="background:hsl(72,70%,50%)"></div>
+              <div class="preset-dot" style="background:hsl(144,70%,50%)"></div>
+              <div class="preset-dot" style="background:hsl(216,70%,50%)"></div>
+              <div class="preset-dot" style="background:hsl(288,70%,50%)"></div>
+            </div>
+            <div class="preset-info">
+              <div class="preset-name">Grand Tour</div>
+              <div class="preset-desc">All 12 notes on all 15 instruments — 180 stations, one loop</div>
+              <div class="preset-badge">180 STATIONS · DEFAULT</div>
+            </div>
+            <div class="preset-load">LOAD</div>
+          </div>
 
           <div class="preset-item" onclick="loadPreset('blank')">
             <div class="preset-dots"><div class="preset-dot" style="background:#111;border:1px solid #333"></div></div>
@@ -2006,6 +2025,14 @@ function setSpeed(s){
 // ═══════════════════════════════════════════
 // GRID SIZE
 // ═══════════════════════════════════════════
+function setGridSize(w,h){
+  gridW=w;gridH=h;
+  const slGw=document.getElementById('sl-gw');
+  const slGh=document.getElementById('sl-gh');
+  if(slGw){slGw.value=gridW;document.getElementById('val-gw').textContent=gridW;}
+  if(slGh){slGh.value=gridH;document.getElementById('val-gh').textContent=gridH;}
+}
+
 function updateGridSize(){
   gridW=parseInt(document.getElementById('sl-gw').value);
   gridH=parseInt(document.getElementById('sl-gh').value);
@@ -2050,7 +2077,20 @@ function renderColorList(){
       s.classList.add('active-swatch');
       setTool('paint');
     };
-    s.oncontextmenu=e=>openSwatchContextMenu(e,col.id);
+    let pressTimer=null;
+    s.style.userSelect='none';s.style.webkitUserSelect='none';
+    s.addEventListener('touchstart',e=>{
+      pressTimer=setTimeout(()=>{
+        pressTimer=null;
+        e.preventDefault();
+        openSwatchContextMenu(e.touches[0]||e.changedTouches[0],col.id);
+      },500);
+    },{passive:true});
+    s.addEventListener('touchend',e=>{
+      if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+    });
+    s.addEventListener('touchmove',()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}});
+    s.oncontextmenu=e=>{e.preventDefault();openSwatchContextMenu(e,col.id);};
     picker.appendChild(s);
   });
   const active=colors.find(c=>c.id===paintColorId);
@@ -2068,19 +2108,25 @@ function renderCompatGrid(){
   gridEl.innerHTML='';
   appendEmpty(gridEl);
   colors.forEach(col=>{
-    const cell=document.createElement('div');cell.className='compat-cell header-cell';
-    cell.innerHTML=`<div class="axis-swatch-wrap"><div class="axis-swatch" style="background:${col.hex}" title="${col.name}" onclick="openEditor('${col.id}')" oncontextmenu="event.preventDefault();openSwatchContextMenu(event,'${col.id}')"></div></div>`;
-    gridEl.appendChild(cell);
+    const headerCell=document.createElement('div');headerCell.className='compat-cell header-cell';
+    headerCell.innerHTML=`<div class="axis-swatch-wrap"><div class="axis-swatch" style="background:${col.hex}" title="${col.name}"></div></div>`;
+    const sw=headerCell.querySelector('.axis-swatch');
+    sw.onclick=()=>openEditor(col.id);
+    addSwatchLongPress(sw,col.id);
+    gridEl.appendChild(headerCell);
   });
   const addBtn=document.createElement('button');addBtn.className='add-axis-btn';addBtn.textContent='+';addBtn.title='Add color';addBtn.onclick=()=>openInlineWheel(null);
   gridEl.appendChild(addBtn);
   colors.forEach((rowCol,ri)=>{
     const rh=document.createElement('div');rh.className='compat-cell header-cell';
-    rh.innerHTML=`<div class="axis-swatch-wrap"><div class="axis-swatch" style="background:${rowCol.hex}" title="${rowCol.name}" onclick="openEditor('${rowCol.id}')" oncontextmenu="event.preventDefault();openSwatchContextMenu(event,'${rowCol.id}')"></div></div>`;
+    rh.innerHTML=`<div class="axis-swatch-wrap"><div class="axis-swatch" style="background:${rowCol.hex}" title="${rowCol.name}"></div></div>`;
+    const rhSw=rh.querySelector('.axis-swatch');
+    rhSw.onclick=()=>openEditor(rowCol.id);
+    addSwatchLongPress(rhSw,rowCol.id);
     gridEl.appendChild(rh);
     colors.forEach((colCol,ci)=>{
       const cell=document.createElement('div');cell.className='compat-cell';
-      if(ri===ci){cell.classList.add('diagonal');cell.style.background=rowCol.hex+'22';cell.title=`Edit ${rowCol.name}`;cell.onclick=()=>openEditor(rowCol.id);cell.oncontextmenu=e=>{e.preventDefault();openSwatchContextMenu(e,rowCol.id);};gridEl.appendChild(cell);return;}
+      if(ri===ci){cell.classList.add('diagonal');cell.style.background=rowCol.hex+'22';cell.title=`Edit ${rowCol.name}`;cell.onclick=()=>openEditor(rowCol.id);addSwatchLongPress(cell,rowCol.id);gridEl.appendChild(cell);return;}
       const inter=getInteraction(rowCol.id,colCol.id);
       const net=inter.attraction-inter.repulsion;
       if(inter.reaction==='ghost') cell.style.background='rgba(180,120,255,0.45)';
@@ -2920,6 +2966,7 @@ function _loadPreset(name){
   if(name==='blank'){colors=[];paintColorId=null;renderAll();resetPan();return;}
 
   if(name==='bouncer'){
+    setGridSize(20,20);
     colors=[
       {id:'b0',name:'Signal',hex:'#ff4444',rules:{...defaultRules(),moveDir:'E',moveSpeed:1,moveDelay:1,moveBounce:true}},
       {id:'b1',name:'Wall',hex:'#4488ff',rules:{...defaultRules(),moveDir:'none'}},
@@ -2931,10 +2978,11 @@ function _loadPreset(name){
     grid[mid*gridW+2]=birthCell('b1');
     grid[mid*gridW+Math.floor(gridW/2)]=birthCell('b0');
     grid[mid*gridW+(gridW-3)]=birthCell('b1');
-    renderAll();resetPan();drawGrid();return;
+    resizeCanvas();renderAll();resetPan();drawGrid();return;
   }
 
   if(name==='primordial'){
+    setGridSize(20,20);
     colors=[
       {id:'p0',name:'Vermillion',hex:'#ff4444',rules:defaultRules()},
       {id:'p1',name:'Jade',hex:'#44ff88',rules:defaultRules()},
@@ -2950,7 +2998,7 @@ function _loadPreset(name){
   if(chaosMap[name])_buildChaosPreset(chaosMap[name]);
 
   if(name==='tide'){
-    // ── DRIFT — composed by Claude ──
+    setGridSize(30,20);
     // A repeating melodic phrase in A minor built as a pixel signal chain.
     // A moving signal cell travels east along a row of stationary note stations.
     // Each station plays its note when the signal arrives then converts it,
@@ -3078,11 +3126,11 @@ function _loadPreset(name){
       if(x<gridW) grid[chordY*gridW+x]={...makeCell(),colorId:'m9'};
     }
 
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='gears'){
-    // ── GEARS — composed by Claude ──
+    setGridSize(40,40);
     // A digital music box. Two ghost signals loop clockwise and counterclockwise
     // around concentric squares, activating note stations as they pass.
     // The squares are different sizes so the signals phase in and out of sync,
@@ -3292,7 +3340,7 @@ function _loadPreset(name){
     placeGhost(iR-1, iT, 'g1');
 
     paintColorId='n0';
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='soundtest'){
@@ -3302,7 +3350,7 @@ function _loadPreset(name){
     // Four corner turns. Each station plays onContact with the signal.
     // Use this to test note pitches, waveforms, volumes and durations.
 
-    clearGrid();interactions={};selectedPair=null;
+    setGridSize(30,30);clearGrid();interactions={};selectedPair=null;
 
     const notes=NOTE_NAMES; // ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
     const waveforms=['sine','sine','triangle','triangle','square','square','sawtooth','sawtooth','sine','triangle','square','sawtooth'];
@@ -3415,14 +3463,14 @@ function _loadPreset(name){
     placeGhostCell(L+1, T, 'sig');
 
     paintColorId=stationIds[0];
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='instrtest'){
     // ── INSTRUMENT TEST — one station per instrument, same note ──
     // Signal loops a large square triggering A4 on each of the 15 instruments.
     // Use this to compare instrument timbres side by side.
-    clearGrid();interactions={};selectedPair=null;
+    setGridSize(30,30);clearGrid();interactions={};selectedPair=null;
 
     const instList=INSTRUMENTS; // all 15
     const instColors=instList.map((inst,i)=>({
@@ -3504,7 +3552,7 @@ function _loadPreset(name){
     colors.find(c=>c.id==='itsig').rules.moveDir='E';
     iGhost(iL+1,iT,'itsig');
     paintColorId='it0';
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='solstice'){
@@ -3528,7 +3576,7 @@ function _loadPreset(name){
     //   D5 high shimmer at each turn — clock ticks
     //
     // All loops use ghostIs corners for clean direction changes.
-    clearGrid();interactions={};selectedPair=null;
+    setGridSize(35,35);clearGrid();interactions={};selectedPair=null;
 
     // ── Station maker ──
     function mkSol(note,oct,inst,vol,dur,sigId,hex,name){
@@ -3731,7 +3779,7 @@ function _loadPreset(name){
     sGhost(iL+1,iT,'sInner');
 
     paintColorId=harpNotes[0].id;
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='firstlight'){
@@ -3749,7 +3797,7 @@ function _loadPreset(name){
     // Return:    G4 B4 D5 E5 D5 B4 G4
     // Closing:   A4 G4
 
-    clearGrid();interactions={};selectedPair=null;
+    setGridSize(40,40);clearGrid();interactions={};selectedPair=null;
 
     const melody=[
       // Opening — quiet, rising
@@ -3907,7 +3955,7 @@ function _loadPreset(name){
     flGhost(L+1,T,'flsig');
 
     paintColorId=stationColors[0].id;
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 
   if(name==='furelise'){
@@ -3921,7 +3969,7 @@ function _loadPreset(name){
     // Motif repeat:    E5 D#5 E5 D#5 E5 B4 D5 C5 A4
     // Response 2:      C4 E4 A4 B4 — E4 C5 B4 A4
 
-    clearGrid();interactions={};selectedPair=null;
+    setGridSize(30,30);clearGrid();interactions={};selectedPair=null;
 
     const melody=[
       // Main motif — first statement
@@ -4054,7 +4102,141 @@ function _loadPreset(name){
     feGhost(L+1,T,'fesig');
 
     paintColorId=stationColors[0].id;
-    renderAll();resetPan();drawGrid();
+    resizeCanvas();renderAll();resetPan();drawGrid();
+  }
+
+  if(name==='grandtour'){
+    // ── GRAND TOUR — default opening preset ──
+    // One ghost signal loops a large square hitting every note of the
+    // chromatic scale on every instrument. 180 stations total.
+    // 15 instruments × 12 notes = 180 — arranged so each instrument
+    // group plays its full chromatic scale before moving to the next.
+    // Signal delay 2 — brisk enough to feel musical, slow enough to hear each note.
+
+    setGridSize(50,50);clearGrid();interactions={};selectedPair=null;
+
+    const instOrder=[
+      'piano','harp','musicbox','xylophone','marimba',
+      'chimes','guitar','eguitar','harpsi',
+      'violin','cello','flute','clarinet','oboe','steelpan'
+    ];
+    const instLabels={
+      piano:'Piano',harp:'Harp',musicbox:'Music Box',xylophone:'Xylophone',
+      marimba:'Marimba',chimes:'Chimes',guitar:'Guitar',eguitar:'E.Guitar',
+      harpsi:'Harpsi',violin:'Violin',cello:'Cello',flute:'Flute',
+      clarinet:'Clarinet',oboe:'Oboe',steelpan:'Steel Pan'
+    };
+    // Octave per instrument — lower for bass-y instruments
+    const instOctave={
+      piano:4,harp:4,musicbox:5,xylophone:4,marimba:4,
+      chimes:5,guitar:4,eguitar:4,harpsi:4,
+      violin:5,cello:3,flute:5,clarinet:4,oboe:4,steelpan:4
+    };
+    // Duration per instrument
+    const instDur={
+      piano:0.5,harp:0.7,musicbox:0.4,xylophone:0.3,marimba:0.4,
+      chimes:0.8,guitar:0.5,eguitar:0.4,harpsi:0.3,
+      violin:0.6,cello:0.8,flute:0.5,clarinet:0.5,oboe:0.5,steelpan:0.5
+    };
+    // Color per instrument group — hue spread across spectrum
+    const instHue={
+      piano:0,harp:25,musicbox:50,xylophone:75,marimba:100,
+      chimes:125,guitar:150,eguitar:170,harpsi:195,
+      violin:220,cello:245,flute:270,clarinet:295,oboe:320,steelpan:345
+    };
+
+    // Build all 180 station colors
+    const gtStations=[];
+    instOrder.forEach(inst=>{
+      NOTE_NAMES.forEach(note=>{
+        const hue=instHue[inst];
+        const noteIdx=NOTE_NAMES.indexOf(note);
+        const l=40+Math.round((noteIdx/11)*20);
+        gtStations.push({
+          id:`gt_${inst}_${note}`,
+          name:`${note} ${instLabels[inst]}`,
+          hex:`hsl(${hue},70%,${l}%)`,
+          rules:{...defaultRules(),
+            moveDir:'none',anchored:true,ghost:false,
+            neighborMin:0,neighborMax:8,neighborSameAttr:50,neighborDiffRep:50,
+            soundNote:note,soundOctave:instOctave[inst],soundWaveform:'sine',
+            soundVolume:72,soundDuration:instDur[inst],
+            soundTrigger:'onContact',soundTriggerColor:'gtsig',
+            soundInstrument:inst,
+            conditionals:[]
+          }
+        });
+      });
+    });
+
+    // Corner turn colors
+    function mkGTCorner(dir){
+      return{...defaultRules(),moveDir:'none',anchored:true,ghost:false,
+        neighborMin:0,neighborMax:8,neighborSameAttr:50,neighborDiffRep:50,
+        soundNote:'none',conditionals:[{
+          condition:'ghostIs',condValue:'',condColor:'gtsig',
+          action:'changeDir',actionValue:dir,actionColor:''
+        }]};
+    }
+
+    colors=[
+      {id:'gtsig',name:'Signal',hex:'#ffffff',rules:{
+        ...defaultRules(),moveDir:'E',moveSpeed:1,moveDelay:2,
+        moveDriftChance:0,moveBounce:false,
+        ghost:true,anchored:false,soundNote:'none',conditionals:[]
+      }},
+      ...gtStations,
+      {id:'gtTR',name:'Corner TR',hex:'#111',rules:mkGTCorner('S')},
+      {id:'gtBR',name:'Corner BR',hex:'#111',rules:mkGTCorner('W')},
+      {id:'gtBL',name:'Corner BL',hex:'#111',rules:mkGTCorner('N')},
+      {id:'gtTL',name:'Corner TL',hex:'#111',rules:mkGTCorner('E')},
+    ];
+
+    const gtAllIds=['gtsig',...gtStations.map(c=>c.id),'gtTR','gtBR','gtBL','gtTL'];
+    for(let i=0;i<gtAllIds.length;i++)for(let j=i+1;j<gtAllIds.length;j++){
+      const inter=getInteraction(gtAllIds[i],gtAllIds[j]);
+      inter.attraction=0;inter.repulsion=0;inter.energyTransfer=0;inter.reaction='none';
+    }
+    gtStations.forEach(s=>getInteraction('gtsig',s.id).reaction='ghost');
+    ['gtTR','gtBR','gtBL','gtTL'].forEach(c=>getInteraction('gtsig',c).reaction='ghost');
+
+    // Set grid large enough for 180 stations + 4 corners
+    setGridSize(50,50);
+
+    grid=makeGrid(gridW,gridH);
+    const gtMg=1;
+    const gtL=gtMg,gtR=gridW-1-gtMg,gtT=gtMg,gtB=gridH-1-gtMg;
+    const gtTopW=gtR-gtL-1,gtSideH=gtB-gtT-1;
+    const gtTotal=gtStations.length;
+
+    function gtPlace(x,y,colId){
+      if(x<0||x>=gridW||y<0||y>=gridH)return;
+      if(!grid[y*gridW+x].colorId)grid[y*gridW+x]=birthCell(colId);
+    }
+    function gtGhost(x,y,gid){
+      if(x<0||x>=gridW||y<0||y>=gridH)return;
+      grid[y*gridW+x].ghostId=gid;grid[y*gridW+x].ghostTicks=0;
+    }
+
+    gtPlace(gtR,gtT,'gtTR');gtPlace(gtR,gtB,'gtBR');
+    gtPlace(gtL,gtB,'gtBL');gtPlace(gtL,gtT,'gtTL');
+
+    const gtPerim=2*gtTopW+2*gtSideH;
+    for(let i=0;i<gtTotal;i++){
+      const pos=Math.round((i+0.5)*(gtPerim/gtTotal));
+      let px,py;
+      if(pos<gtTopW){px=gtL+1+pos;py=gtT;}
+      else if(pos<gtTopW+gtSideH){px=gtR;py=gtT+1+(pos-gtTopW);}
+      else if(pos<2*gtTopW+gtSideH){px=gtR-1-(pos-gtTopW-gtSideH);py=gtB;}
+      else{px=gtL;py=gtB-1-(pos-2*gtTopW-gtSideH);}
+      gtPlace(px,py,gtStations[i].id);
+    }
+
+    colors.find(c=>c.id==='gtsig').rules.moveDir='E';
+    gtGhost(gtL+1,gtT,'gtsig');
+
+    paintColorId=gtStations[0].id;
+    resizeCanvas();renderAll();resetPan();drawGrid();
   }
 }
 
@@ -4184,19 +4366,42 @@ function loadColorFile(){
 // ── Right-click swatch context menu ──
 let scmColorId=null;
 
+function addSwatchLongPress(el,colorId){
+  let t=null;
+  el.style.userSelect='none';
+  el.style.webkitUserSelect='none';
+  el.addEventListener('touchstart',e=>{
+    t=setTimeout(()=>{
+      t=null;
+      openSwatchContextMenu(e.touches[0]||e.changedTouches[0],colorId);
+    },500);
+  },{passive:true});
+  el.addEventListener('touchend',()=>{if(t){clearTimeout(t);t=null;}});
+  el.addEventListener('touchmove',()=>{if(t){clearTimeout(t);t=null;}});
+  el.oncontextmenu=e=>{e.preventDefault();openSwatchContextMenu(e,colorId);};
+}
+
 function openSwatchContextMenu(e,colorId){
-  e.preventDefault();
   scmColorId=colorId;
   const col=colors.find(c=>c.id===colorId);if(!col)return;
   document.getElementById('scm-dot').style.background=col.hex;
   document.getElementById('scm-name').textContent=col.name;
   const menu=document.getElementById('swatch-context-menu');
+  // Show offscreen first to measure real height
+  menu.style.visibility='hidden';
   menu.style.display='flex';
+  const mw=menu.offsetWidth||155;
+  const mh=menu.offsetHeight||160;
   const vw=window.innerWidth,vh=window.innerHeight;
-  let px=e.clientX+4,py=e.clientY+4;
-  if(px+150>vw)px=vw-155;
-  if(py+130>vh)py=vh-135;
-  menu.style.left=px+'px';menu.style.top=py+'px';
+  let px=(e.clientX||e.pageX||vw/2)+4;
+  let py=(e.clientY||e.pageY||vh/2)+4;
+  if(px+mw>vw)px=vw-mw-6;
+  if(py+mh>vh)py=vh-mh-6;
+  if(px<4)px=4;
+  if(py<4)py=4;
+  menu.style.left=px+'px';
+  menu.style.top=py+'px';
+  menu.style.visibility='visible';
 }
 
 function closeSwatchContextMenu(){
@@ -4293,6 +4498,8 @@ seedPresetDots();
 renderAll();
 resizeCanvas();
 initIWCanvas();
+// Load default preset after first paint so canvas has real dimensions
+requestAnimationFrame(()=>requestAnimationFrame(()=>_loadPreset('grandtour')));
 </script>
 </body>
 </html>
