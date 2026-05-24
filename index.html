@@ -2838,19 +2838,13 @@ function setTool(t){
 function clearGrid(){if(audioCtx)stopAllSounds();grid=makeGrid(gridW,gridH);generation=0;document.getElementById('gen-counter').textContent='GEN 0';drawGrid();}
 function randomFill(){
   if(!colors.length)return;
-  if(audioCtx)stopAllSounds();
   const wasRunning=running;
-  if(wasRunning){
-    running=false;
-    clearInterval(simInterval);
-    Object.keys(soundCooldowns).forEach(k=>delete soundCooldowns[k]);
-  }
-  grid=grid.map(()=>Math.random()<0.3?birthCell(colors[Math.floor(Math.random()*colors.length)].id):makeCell());
-  drawGrid();
-  if(wasRunning){
-    running=true;
-    simInterval=setInterval(simStep,Math.round(1000/(speed*5)));
-  }
+  if(wasRunning)togglePlay();
+  setTimeout(()=>{
+    grid=grid.map(()=>Math.random()<0.3?birthCell(colors[Math.floor(Math.random()*colors.length)].id):makeCell());
+    drawGrid();
+    if(wasRunning)togglePlay();
+  },50);
 }
 
 // ═══════════════════════════════════════════
