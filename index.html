@@ -2839,8 +2839,18 @@ function clearGrid(){if(audioCtx)stopAllSounds();grid=makeGrid(gridW,gridH);gene
 function randomFill(){
   if(!colors.length)return;
   if(audioCtx)stopAllSounds();
+  const wasRunning=running;
+  if(wasRunning){
+    running=false;
+    clearInterval(simInterval);
+    Object.keys(soundCooldowns).forEach(k=>delete soundCooldowns[k]);
+  }
   grid=grid.map(()=>Math.random()<0.3?birthCell(colors[Math.floor(Math.random()*colors.length)].id):makeCell());
   drawGrid();
+  if(wasRunning){
+    running=true;
+    simInterval=setInterval(simStep,Math.round(1000/(speed*5)));
+  }
 }
 
 // ═══════════════════════════════════════════
