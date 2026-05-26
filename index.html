@@ -23,9 +23,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:8px
 .speed-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;border-radius:3px;transition:all 0.15s;white-space:nowrap;}
 .speed-btn:hover{border-color:var(--accent);color:var(--accent);}
 .speed-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
-.play-btn{background:var(--accent);border:none;color:#000;font-family:'Share Tech Mono',monospace;font-size:13px;padding:5px 14px;cursor:pointer;border-radius:3px;font-weight:700;transition:all 0.15s;letter-spacing:1px;}
-.play-btn:hover{background:#fff;}
-.play-btn.paused{background:var(--surface2);color:var(--accent);border:1px solid var(--accent);}
+.play-btn{background:#000;border:2px solid var(--accent);color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:13px;padding:5px 14px;cursor:pointer;border-radius:3px;font-weight:700;letter-spacing:1px;min-width:90px;text-align:center;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.play-btn:hover{background:#111;border-color:#fff;color:#fff;}
+
 .gen-counter{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-muted);white-space:nowrap;}
 
 /* CANVAS */
@@ -282,14 +282,14 @@ select option{background:#1a1a1a;}
 <body>
 
 <header>
-  <div class="title">EDGE·OF·ORDER</div>
+  <div class="title">PIXEL·TINKERER</div>
   <div class="speed-controls">
     <button class="speed-btn" onclick="setSpeed(1)">1×</button>
     <button class="speed-btn active" onclick="setSpeed(2)">2×</button>
     <button class="speed-btn" onclick="setSpeed(5)">5×</button>
     <button class="speed-btn" onclick="setSpeed(10)">10×</button>
   </div>
-  <button class="play-btn paused" id="play-btn" onclick="togglePlay()">▶ RUN</button>
+  <button class="play-btn" id="play-btn" onclick="togglePlay()">▶ START</button>
   <div class="gen-counter" id="gen-counter">GEN 0</div>
 </header>
 
@@ -378,8 +378,9 @@ select option{background:#1a1a1a;}
         <div id="iw-title" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:2px;">ADD COLOR</div>
         <button class="mo-cancel" style="flex:0;padding:5px 10px;font-size:11px" onclick="closeInlineWheel()">✕</button>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;align-items:center;gap:10px;">
-        <canvas id="iw-canvas" width="200" height="200" style="border-radius:50%;cursor:crosshair;touch-action:none;width:180px;height:180px;"></canvas>
+      <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;">
+        <!-- Hue band: full width, saturated top → unsaturated bottom -->
+        <canvas id="iw-canvas" width="300" height="60" style="width:100%;height:60px;border-radius:6px;cursor:crosshair;touch-action:none;border:1px solid var(--border);"></canvas>
         <div style="display:flex;align-items:center;gap:8px;width:100%;">
           <span style="font-size:9px;color:var(--text-muted);font-family:'Share Tech Mono',monospace;">BRT</span>
           <input type="range" min="5" max="95" value="55" id="iw-brightness" oninput="updateIWPreview()" style="flex:1">
@@ -1866,7 +1867,7 @@ function initAudio(){ensureAudio();}
 function transitionThen(fn){
   const overlay=document.getElementById('transition-overlay');
   // Stop sim immediately
-  if(running){running=false;clearInterval(simInterval);const btn=document.getElementById('play-btn');btn.textContent='▶ RUN';btn.classList.add('paused');}
+  if(running){running=false;clearInterval(simInterval);const btn=document.getElementById('play-btn');btn.textContent='▶ START';}
   // Fade audio out via master gain ramp if context running
   if(audioCtx&&audioCtx.state==='running'){
     try{
@@ -2187,9 +2188,9 @@ function togglePlay(){
   initAudio();
   running=!running;
   const btn=document.getElementById('play-btn');
-  if(running){btn.textContent='⏸ PAUSE';btn.classList.remove('paused');simInterval=setInterval(simStep,Math.round(1000/(speed*5)));}
+  if(running){btn.textContent='■ STOP';simInterval=setInterval(simStep,Math.round(1000/(speed*5)));}
   else{
-    btn.textContent='▶ RUN';btn.classList.add('paused');
+    btn.textContent='▶ START';
     clearInterval(simInterval);
     // Don't suspend audio — let currently playing notes finish naturally
     // triggerSound already guards if(!running)return so no new sounds fire
@@ -2289,8 +2290,15 @@ function renderColorList(){
     picker.appendChild(s);
   });
   const active=colors.find(c=>c.id===paintColorId);
-  if(active){document.getElementById('active-color-swatch').style.background=active.hex;document.getElementById('active-color-label').textContent=active.name;}
-  else if(colors.length>0){paintColorId=colors[0].id;document.getElementById('active-color-swatch').style.background=colors[0].hex;document.getElementById('active-color-label').textContent=colors[0].name;}
+  if(active){
+    document.getElementById('active-color-swatch').style.background=active.hex;
+    document.getElementById('active-color-label').textContent=active.name;
+  } else {
+    // No active color — show neutral "none" state
+    paintColorId=null;
+    document.getElementById('active-color-swatch').style.background='transparent';
+    document.getElementById('active-color-label').textContent='None';
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -2724,15 +2732,15 @@ function closeInlineWheel(){
 function drawIWWheel(){
   const wc=document.getElementById('iw-canvas');if(!wc)return;
   const wctx=wc.getContext('2d');
-  const cx=wc.width/2,cy=wc.height/2,r=cx-4;
-  const img=wctx.createImageData(wc.width,wc.height);
-  for(let y=0;y<wc.height;y++){
-    for(let x=0;x<wc.width;x++){
-      const dx=x-cx,dy=y-cy,dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist>r)continue;
-      const hue=((Math.atan2(dy,dx)+Math.PI*2)%(Math.PI*2))/(Math.PI*2)*360;
-      const[rr,gg,bb]=hslToRgb(hue/360,dist/r,0.5);
-      const i=(y*wc.width+x)*4;
+  const W=wc.width,H=wc.height;
+  const img=wctx.createImageData(W,H);
+  for(let y=0;y<H;y++){
+    // Top row = fully saturated, bottom row = fully desaturated (grey)
+    const sat=1-(y/(H-1));
+    for(let x=0;x<W;x++){
+      const hue=(x/W)*360;
+      const[rr,gg,bb]=hslToRgb(hue/360,sat,0.5);
+      const i=(y*W+x)*4;
       img.data[i]=rr;img.data[i+1]=gg;img.data[i+2]=bb;img.data[i+3]=255;
     }
   }
@@ -2750,31 +2758,51 @@ function updateIWPreview(){
 function pickIWColor(e){
   const wc=document.getElementById('iw-canvas');if(!wc)return;
   const rect=wc.getBoundingClientRect();
-  const sx=wc.width/rect.width,sy=wc.height/rect.height;
-  let px,py;
-  if(e.touches){px=(e.touches[0].clientX-rect.left)*sx;py=(e.touches[0].clientY-rect.top)*sy;}
-  else{px=(e.clientX-rect.left)*sx;py=(e.clientY-rect.top)*sy;}
-  const cx=wc.width/2,cy=wc.height/2,r=cx-4;
-  const dx=px-cx,dy=py-cy,dist=Math.sqrt(dx*dx+dy*dy);
-  if(dist>r)return;
-  iwHue=((Math.atan2(dy,dx)+Math.PI*2)%(Math.PI*2))/(Math.PI*2)*360;
-  iwSat=Math.min(1,dist/r);
+  let cx,cy;
+  if(e.touches){cx=e.touches[0].clientX-rect.left;cy=e.touches[0].clientY-rect.top;}
+  else{cx=e.clientX-rect.left;cy=e.clientY-rect.top;}
+  iwHue=Math.max(0,Math.min(1,cx/rect.width))*360;
+  iwSat=Math.max(0,Math.min(1,1-(cy/rect.height)));
   updateIWPreview();
+}
+
+function neutralRules(){
+  // Inert rules — no movement, no forces, no reactions
+  return{...defaultRules(),
+    moveDir:'none',moveSpeed:1,moveDelay:1,moveDriftChance:0,
+    moveGravity:'none',moveBounce:false,anchored:false,ghost:false,
+    neighborMin:0,neighborMax:8,neighborSameAttr:0,neighborDiffRep:0,
+    spawnReproduce:false,spawnSeed:false,spawnTrail:false,
+    transformDecay:false,transformEvolve:false,transformMutateChance:0,
+    birthEnabled:false,surviveEnabled:false,evolveAtEnabled:false,
+  };
+}
+function neutralInteraction(){
+  return{attraction:0,repulsion:0,energyTransfer:0,reaction:'none'};
 }
 
 function confirmInlineWheel(){
   const name=document.getElementById('iw-name').value.trim();
   if(iwMode==='add'){
     const id='c'+Date.now();
-    const col={id,name:name||'Color '+(colors.length+1),hex:iwHex,rules:defaultRules()};
+    const col={id,name:name||'Color '+(colors.length+1),hex:iwHex,rules:neutralRules()};
     colors.push(col);
+    // Set neutral interactions with all existing colors
+    colors.forEach(other=>{
+      if(other.id===id)return;
+      const k=getInteractionKey(id,other.id);
+      interactions[k]=neutralInteraction();
+    });
     paintColorId=id;
+    closeInlineWheel();
+    renderAll();
+    // Auto-open color editor for new color
+    openEditor(id);
   } else {
     const col=colors.find(c=>c.id===iwEditId);
     if(col){
       if(name)col.name=name;
       col.hex=iwHex;
-      // Update CEO header if editor open for this color
       const dot=document.getElementById('ceo-dot');
       const title=document.getElementById('ceo-title');
       if(editingColorId===iwEditId){
@@ -2782,10 +2810,10 @@ function confirmInlineWheel(){
         if(title)title.textContent=(name||col.name).toUpperCase();
       }
     }
+    closeInlineWheel();
+    renderAll();
+    if(editingColorId)renderCEOTab();
   }
-  closeInlineWheel();
-  renderAll();
-  if(editingColorId)renderCEOTab();
 }
 
 // Wire iw-canvas events after DOM ready
@@ -3421,6 +3449,17 @@ function _loadPreset(name){
   if(audioCtx)stopAllSounds();
   clearGrid();interactions={};selectedPair=null;
 
+  if(name==='blankstart'){
+    setGridSize(30,30);
+    colors=[];paintColorId=null;interactions={};selectedPair=null;
+    document.getElementById('active-color-swatch').style.background='transparent';
+    document.getElementById('active-color-label').textContent='None';
+    document.getElementById('sl-gw').value=30;document.getElementById('val-gw').textContent=30;
+    document.getElementById('sl-gh').value=30;document.getElementById('val-gh').textContent=30;
+    grid=makeGrid(30,30);generation=0;
+    document.getElementById('gen-counter').textContent='GEN 0';
+    resizeCanvas();renderAll();resetPan();drawGrid();return;
+  }
   if(name==='blank'){colors=[];paintColorId=null;renderAll();resetPan();return;}
 
   if(name==='conwaygol'){
@@ -5098,7 +5137,7 @@ renderAll();
 resizeCanvas();
 initIWCanvas();
 // Load default preset after first paint so canvas has real dimensions
-requestAnimationFrame(()=>requestAnimationFrame(()=>_loadPreset('grandtour')));
+requestAnimationFrame(()=>requestAnimationFrame(()=>_loadPreset('blankstart')));
 </script>
 </body>
 </html>
